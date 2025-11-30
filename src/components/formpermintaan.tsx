@@ -9,12 +9,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { jwtDecode } from "jwt-decode";
+import { NotificationPopup, useNotification } from "@/components/notification-popup";
 
 type JWTPayload = {
   id: string;
 };
 
 export default function PermintaanBarangForm() {
+  const { notification, showNotification, closeNotification } = useNotification();
   const [userId, setUserId] = useState<number | null>(null);
   const [nama, setNama] = useState("");
   const [jabatan, setJabatan] = useState("");
@@ -35,7 +37,7 @@ export default function PermintaanBarangForm() {
         ?.split("=")[1];
 
       if (!token) {
-        alert("Token tidak ditemukan, silakan login ulang.");
+        showNotification('error', 'Login Diperlukan', 'Token tidak ditemukan, silakan login ulang.');
         return;
       }
 
@@ -46,7 +48,7 @@ export default function PermintaanBarangForm() {
         setUserId(parsedId);
       } catch (err) {
         console.error("Gagal decode token:", err);
-        alert("Token tidak valid. Silakan login ulang.");
+        showNotification('error', 'Token Tidak Valid', 'Silakan login ulang untuk melanjutkan.');
       }
     }
 
@@ -65,7 +67,7 @@ export default function PermintaanBarangForm() {
           setSelectedBarangId(filtered[0].id);
         } else {
           setSelectedBarangId(null);
-          alert("Tidak ada barang permintaan tersedia.");
+          showNotification('warning', 'Tidak Ada Barang', 'Tidak ada barang permintaan tersedia saat ini.');
         }
       } catch (error) {
         console.error("Gagal ambil data barang:", error);
@@ -74,15 +76,24 @@ export default function PermintaanBarangForm() {
 
     getUserFromCookie();
     fetchBarang();
-  }, []);
+  }, [showNotification]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
 
-    if (!userId) return alert("User tidak ditemukan. Silakan login ulang.");
-    if (!selectedBarangId) return alert("Pilih barang terlebih dahulu.");
-    if (jumlah === "" || jumlah <= 0) return alert("Jumlah harus lebih dari 0.");
+    if (!userId) {
+      showNotification('error', 'Login Diperlukan', 'User tidak ditemukan. Silakan login ulang.');
+      return;
+    }
+    if (!selectedBarangId) {
+      showNotification('warning', 'Data Tidak Lengkap', 'Pilih barang terlebih dahulu.');
+      return;
+    }
+    if (jumlah === "" || jumlah <= 0) {
+      showNotification('warning', 'Data Tidak Valid', 'Jumlah harus lebih dari 0.');
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -109,7 +120,7 @@ export default function PermintaanBarangForm() {
         throw new Error(errData.message || "Gagal mengirim permintaan");
       }
 
-      alert("Permintaan berhasil dikirim");
+      showNotification('success', 'Berhasil! 🎉', 'Permintaan berhasil dikirim dan menunggu persetujuan admin');
 
       // Reset form
       setNama("");
@@ -122,125 +133,135 @@ export default function PermintaanBarangForm() {
 
     } catch (err) {
       console.error(err);
-      alert("Terjadi kesalahan saat submit");
+      const errorMessage = err instanceof Error ? err.message : 'Terjadi kesalahan saat submit';
+      showNotification('error', 'Gagal Mengirim', errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <form className="space-y-6 max-w-md mx-auto" onSubmit={handleSubmit}>
-      <div>
-        <Label htmlFor="nama">Nama</Label>
-        <Input
-          id="nama"
-          type="text"
-          placeholder="Masukkan nama"
-          value={nama}
-          onChange={(e) => setNama(e.target.value)}
-          required
-        />
-      </div>
+    <>
+      <NotificationPopup
+        isOpen={notification.isOpen}
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+        onClose={closeNotification}
+      />
+      <form className="space-y-6 max-w-md mx-auto" onSubmit={handleSubmit}>
+        <div>
+          <Label htmlFor="nama">Nama</Label>
+          <Input
+            id="nama"
+            type="text"
+            placeholder="Masukkan nama"
+            value={nama}
+            onChange={(e) => setNama(e.target.value)}
+            required
+          />
+        </div>
 
-      <div>
-        <Label htmlFor="jabatan">Jabatan</Label>
-        <select
-          id="jabatan"
-          value={jabatan}
-          onChange={(e) => setJabatan(e.target.value)}
-          required
-          className="w-full border border-input rounded-md px-3 py-2"
-        >
-          <option value="">Pilih jabatan</option>
-          <option value="Guru">Guru</option>
-          <option value="Staf">Staf</option>
-          <option value="Siswa">Siswa</option>
-        </select>
-      </div>
+        <div>
+          <Label htmlFor="jabatan">Jabatan</Label>
+          <select
+            id="jabatan"
+            value={jabatan}
+            onChange={(e) => setJabatan(e.target.value)}
+            required
+            className="w-full border border-input rounded-md px-3 py-2"
+          >
+            <option value="">Pilih jabatan</option>
+            <option value="Guru">Guru</option>
+            <option value="Staf">Staf</option>
+            <option value="Siswa">Siswa</option>
+          </select>
+        </div>
 
-      <div>
-        <Label htmlFor="kelas">Kelas</Label>
-        <Input
-          id="kelas"
-          type="text"
-          placeholder="Masukkan kelas"
-          value={kelas}
-          onChange={(e) => setKelas(e.target.value)}
-        />
-      </div>
+        <div>
+          <Label htmlFor="kelas">Kelas</Label>
+          <Input
+            id="kelas"
+            type="text"
+            placeholder="Masukkan kelas"
+            value={kelas}
+            onChange={(e) => setKelas(e.target.value)}
+          />
+        </div>
 
-      <div>
-        <Label htmlFor="barang">Barang</Label>
-        <select
-          id="barang"
-          value={selectedBarangId ?? ""}
-          onChange={(e) => setSelectedBarangId(Number(e.target.value))}
-          required
-          className="w-full border border-input rounded-md px-3 py-2"
-        >
-          {listBarang.length === 0 && <option value="">Tidak ada barang</option>}
-          {listBarang.map((barang) => (
-            <option key={barang.id} value={barang.id}>
-              {barang.nama} (Stok: {barang.stok})
-            </option>
-          ))}
-        </select>
-      </div>
+        <div>
+          <Label htmlFor="barang">Barang</Label>
+          <select
+            id="barang"
+            value={selectedBarangId ?? ""}
+            onChange={(e) => setSelectedBarangId(Number(e.target.value))}
+            required
+            className="w-full border border-input rounded-md px-3 py-2"
+          >
+            {listBarang.length === 0 && <option value="">Tidak ada barang</option>}
+            {listBarang.map((barang) => (
+              <option key={barang.id} value={barang.id}>
+                {barang.nama} (Stok: {barang.stok})
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <div>
-        <Label htmlFor="keperluan">Keperluan</Label>
-        <Textarea
-          id="keperluan"
-          placeholder="Tuliskan keperluan"
-          value={keperluan}
-          onChange={(e) => setKeperluan(e.target.value)}
-          required
-        />
-      </div>
+        <div>
+          <Label htmlFor="keperluan">Keperluan</Label>
+          <Textarea
+            id="keperluan"
+            placeholder="Tuliskan keperluan"
+            value={keperluan}
+            onChange={(e) => setKeperluan(e.target.value)}
+            required
+          />
+        </div>
 
-      <div>
-        <Label htmlFor="tanggal">Tanggal</Label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              id="tanggal"
-              variant="outline"
-              className="w-full justify-start text-left"
-            >
-              {tanggal ? format(tanggal, "dd MMM yyyy") : "Pilih tanggal"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={tanggal}
-              onSelect={setTanggal}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
+        <div>
+          <Label htmlFor="tanggal">Tanggal</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="tanggal"
+                variant="outline"
+                className="w-full justify-start text-left"
+              >
+                {tanggal ? format(tanggal, "dd MMM yyyy") : "Pilih tanggal"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={tanggal}
+                onSelect={setTanggal}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
 
-      <div>
-        <Label htmlFor="jumlah">Jumlah</Label>
-        <Input
-          id="jumlah"
-          type="number"
-          placeholder="Masukkan jumlah"
-          value={jumlah}
-          onChange={(e) => {
-            const val = e.target.value;
-            if (val === "") setJumlah("");
-            else setJumlah(Number(val));
-          }}
-          min={1}
-          required
-        />
-      </div>
+        <div>
+          <Label htmlFor="jumlah">Jumlah</Label>
+          <Input
+            id="jumlah"
+            type="number"
+            placeholder="Masukkan jumlah"
+            value={jumlah}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "") setJumlah("");
+              else setJumlah(Number(val));
+            }}
+            min={1}
+            required
+          />
+        </div>
 
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? "Mengirim..." : "Submit"}
-      </Button>
-    </form>
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {isSubmitting ? "Mengirim..." : "Submit"}
+        </Button>
+      </form>
+    </>
   );
 }
